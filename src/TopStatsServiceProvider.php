@@ -28,6 +28,10 @@ final class TopStatsServiceProvider extends ServiceProvider
             return new SdkCapture($app->make(TopStats::class));
         });
 
+        // Terminable middleware is re-resolved for terminate(); the singleton
+        // binding keeps handle() and terminate() on one instance.
+        $this->app->singleton(\TopStats\Laravel\Middleware\TrackRequests::class);
+
         $this->app->singleton(Recorder::class, function ($app): Recorder {
             $config = $app['config']['topstats'];
 

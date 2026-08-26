@@ -62,11 +62,14 @@ final class IntegrationTest extends TestCase
     public function testLaravelMiddlewareCapturesTheRouteTemplate(): void
     {
         $capture = new FakeCapture();
-        $middleware = new TrackRequests(new Recorder($capture));
+        $recorder = new Recorder($capture);
 
+        // Laravel resolves a FRESH instance for terminate() unless the class
+        // is a singleton - two instances here prove the start time survives
+        // on the request rather than on middleware state.
         $request = $this->laravelRequest('/users/42', 'users/{id}');
-        $middleware->handle($request, static fn ($passed) => $passed);
-        $middleware->terminate($request, new FakeResponse(200));
+        (new TrackRequests($recorder))->handle($request, static fn ($passed) => $passed);
+        (new TrackRequests($recorder))->terminate($request, new FakeResponse(200));
 
         self::assertCount(1, $capture->events);
         self::assertSame('http_request', $capture->events[0]['name']);

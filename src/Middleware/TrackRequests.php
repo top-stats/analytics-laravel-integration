@@ -11,11 +11,15 @@ use TopStats\Laravel\Recorder;
  * response has left the client, so analytics never sits in the request path.
  * Register it in the global middleware stack (bootstrap/app.php on 11+,
  * Kernel::$middleware before that).
+ *
+ * Laravel resolves a FRESH middleware instance for terminate() unless the
+ * class is bound as a singleton, so the start time lives on the request's
+ * attribute bag - never on instance state. The service provider binds the
+ * singleton too, but the attribute bag keeps this correct either way.
  */
 final class TrackRequests
 {
-    /** @var array<string, float> */
-    private array $startedAt = [];
+    private const STARTED_AT_ATTRIBUTE = 'topstats.started_at';
 
     public function __construct(private readonly Recorder $recorder)
     {
@@ -23,16 +27,14 @@ final class TrackRequests
 
     public function handle(mixed $request, \Closure $next): mixed
     {
-        $this->startedAt[spl_object_hash($request)] = microtime(true);
+        $request->attributes->set(self::STARTED_AT_ATTRIBUTE, microtime(true));
 
         return $next($request);
     }
 
     public function terminate(mixed $request, mixed $response): void
     {
-        $key = spl_object_hash($request);
-        $startedAt = $this->startedAt[$key] ?? null;
-        unset($this->startedAt[$key]);
+        $startedAt = $request->attributes->get(self::STARTED_AT_ATTRIBUTE);
 
         $path = '/' . ltrim((string) $request->path(), '/');
 
